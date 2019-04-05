@@ -6,11 +6,8 @@
 
 
 [![image](https://img.shields.io/travis/TankerHQ/cloudmesh-cm4.svg?branch=master)](https://travis-ci.org/TankerHQ/cloudmesn-cm4)
-
 [![image](https://img.shields.io/pypi/pyversions/cloudmesh-cm4.svg)](https://pypi.org/project/cloudmesh-cm4)
-
 [![image](https://img.shields.io/pypi/v/cloudmesh-cm4.svg)](https://pypi.org/project/cloudmesh-cm4/)
-
 [![image](https://img.shields.io/github/license/TankerHQ/python-cloudmesh-cm4.svg)](https://github.com/TankerHQ/python-cloudmesh-cm4/blob/master/LICENSE)
 
 
