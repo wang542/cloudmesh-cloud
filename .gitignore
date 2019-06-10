@@ -128,3 +128,7 @@ test/data/storage/*
 test/data/download/*
 !test/data/download/README.md
 /cm4/openstack/cloudmesh.yaml
+
+# Docker container
+/docker/cloudmesh/*
+!/docker/cloudmesh/cloudmesh4.yaml

@@ -1,0 +1,12 @@
+version: "3.7"
+services:
+
+  cloudmesh:
+    build:
+      context: ./docker/
+      dockerfile: Dockerfile
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./docker/cloudmesh:/root/.cloudmesh
+
