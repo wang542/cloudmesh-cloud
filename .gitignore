@@ -131,4 +131,4 @@ test/data/download/*
 
 # Docker container
 /docker/cloudmesh/*
-!/docker/cloudmesh/cloudmesh4.yaml
+# !/docker/cloudmesh/cloudmesh4.yaml
