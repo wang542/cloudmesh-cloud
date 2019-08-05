@@ -2,6 +2,8 @@ import os
 import subprocess
 import urllib.parse
 from sys import platform
+from cloudmesh.common.debug import VERBOSE
+from subprocess import check_output
 
 import yaml
 from pymongo import MongoClient
@@ -134,7 +136,7 @@ class MongoInstaller(object):
         mkdir {MONGO_PATH}
         mkdir {MONGO_HOME}
         mkdir {MONGO_LOG}
-        msiexec.exe /l*v {MONGO_LOG}\mdbinstall.log  /qb /i {MONGO_CODE} INSTALLLOCATION={MONGO_PATH} ADDLOCAL="all"
+        msiexec.exe /l*v {MONGO_LOG}\mdbinstall.log /qb /i {MONGO_CODE} INSTALLLOCATION={MONGO_PATH} SHOULD_INSTALL_COMPASS="0" ADDLOCAL="ServerNoService,Router,Client,MonitoringTools,ImportExportTools,MiscellaneousTools"
         """.format(**self.data)
         installer = Script.run(script)
 
@@ -267,13 +269,6 @@ class MongoDBController(object):
             self.set_auth()
             self.stop()
 
-    def import_collection(self,  security=True):
-        auth = ""
-        if security:
-            auth = "--auth"
-        command = "mongoimport {auth} --bind_ip {MONGO_HOST} --dbpath {MONGO_PATH} --logpath {MONGO_LOG}/mongod.log" \
-             " --fork".format(**self.data, auth=auth)
-
     def start(self, security=True):
         """
         start the MongoDB server
@@ -284,11 +279,20 @@ class MongoDBController(object):
 
         if platform.lower() == 'win32':
             try:
-                command = "-scriptblock { " + "mongod {auth} --bind_ip {MONGO_HOST} --dbpath {MONGO_PATH} --logpath {MONGO_LOG}/mongod.log".format(
-                    **self.data, auth=auth) + " }"
-                script = """
-                powershell -noexit start-job {command}
-                """.format(**self.data, command=command)
+                try:
+                    # command prompt - check
+                    cmdcheck=check_output('dir', shell=True)
+
+                    command = "" + "mongod {auth} --bind_ip {MONGO_HOST} --dbpath {MONGO_PATH} --logpath {MONGO_LOG}/mongod.log".format(**self.data, auth=auth) + ""
+                    script = """start {command}""".format(**self.data, command=command)
+
+                except:
+
+                    # powershell
+                    command = "-scriptblock { " + "mongod {auth} --bind_ip {MONGO_HOST} --dbpath {MONGO_PATH} --logpath {MONGO_LOG}/mongod.log".format(
+                        **self.data, auth=auth) + " }"
+                    script = """powershell -noexit start-job {command}""".format(**self.data, command=command)
+
                 Script.run(script)
                 result = "child process started successfully. Program existing now"
             except Exception as e:
