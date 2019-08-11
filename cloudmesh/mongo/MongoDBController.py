@@ -279,20 +279,22 @@ class MongoDBController(object):
 
         if platform.lower() == 'win32':
             try:
-                try:
-                    # powershell - check
-                    powershellcheck=check_output('ls', shell=True)
-
-                    command = "-scriptblock { " + "mongod {auth} --bind_ip {MONGO_HOST} --dbpath {MONGO_PATH} --logpath {MONGO_LOG}/mongod.log".format(
-                        **self.data, auth=auth) + " }"
-                    script = """powershell -noexit start-job {command}""".format(**self.data, command=command)
-
-                except:
-
-                    # windows command prompt
+                print('before self data2')
+                print(self.data["MONGO_HOST"])
+                wincmd = self.data["MONGO_WIN32_CMD"]
+                print(wincmd)
+                if wincmd==True:
+                    # run in cmd.exe
                     command = "" + "mongod {auth} --bind_ip {MONGO_HOST} --dbpath {MONGO_PATH} --logpath {MONGO_LOG}/mongod.log".format(
                         **self.data, auth=auth) + ""
                     script = """start {command}""".format(**self.data, command=command)
+                else:
+                    # run in powershell
+                    command = "-scriptblock { " + "mongod {auth} --bind_ip {MONGO_HOST} --dbpath {MONGO_PATH} --logpath {MONGO_LOG}/mongod.log".format(
+                        **self.data, auth=auth) + " }"
+                    script = """
+                    powershell -noexit start-job {command}
+                    """.format(**self.data, command=command)
 
                 Script.run(script)
                 result = "child process started successfully. Program existing now"
