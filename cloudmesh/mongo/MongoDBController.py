@@ -86,6 +86,7 @@ class MongoInstaller(object):
             Console.msg("   cms admin mongo create")
             Console.msg("   cms admin mongo start")
             Console.msg("")
+            Console.terminate()
 
             return ""
 
@@ -329,7 +330,6 @@ class MongoDBController(object):
     """
 
     def __init__(self, dryrun=False):
-
         self.__dict__ = self.__shared_state
         if "data" not in self.__dict__:
 
@@ -970,7 +970,7 @@ class MongoDBController(object):
             Console.error("ImportasFile: Docker is not yet supported")
             raise NotImplementedError
 
-        self.start_if_not_running()
+        ### self.start_if_not_running()
         tmp_folder = path_expand('~/.cloudmesh/tmp')
         if not os.path.exists(tmp_folder):
             os.makedirs(tmp_folder)

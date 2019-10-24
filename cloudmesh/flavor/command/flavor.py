@@ -1,4 +1,4 @@
-from cloudmesh.common.debug import VERBOSE
+from cloudmesh.common.debug import VERBOSE, TRACE
 from cloudmesh.common.variables import Variables
 from cloudmesh.compute.vm.Provider import Provider
 from cloudmesh.management.configuration.arguments import Arguments
@@ -7,6 +7,7 @@ from cloudmesh.shell.command import PluginCommand
 from cloudmesh.shell.command import command, map_parameters
 from cloudmesh.common.parameter import Parameter
 
+from cloudmesh.common.console import Console
 
 class FlavorCommand(PluginCommand):
 
@@ -90,6 +91,7 @@ class FlavorCommand(PluginCommand):
                     provider = Provider(cloud)
 
                     db = CmDatabase()
+
                     flavors = db.find(collection=f"{cloud}-flavor")
 
                     provider.Print(flavors, output=arguments.output, kind="flavor")

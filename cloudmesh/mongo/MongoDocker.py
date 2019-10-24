@@ -13,11 +13,15 @@ import sys
 import shutil
 from progress.bar import Bar
 from cloudmesh.common.dotdict import dotdict
+from cloudmesh.common.debug import TRACE
+from cloudmesh.common.util import HEADING
+
 
 class MongoDocker(object):
 
 
     def __init__(self, configuration="~/.cloudmesh/cloudmesh.yaml", dryrun=False):
+        HEADING()
         path = path_expand(configuration)
         self.config = Config(config_path=path)
         self.data = self.config["cloudmesh.data.mongo"]
@@ -66,6 +70,7 @@ class MongoDocker(object):
         Starts the MongoDBd Container
         :return:
         """
+        HEADING()
         script = f"docker run -d -p 127.0.0.1:27017:27017/tcp {self.flag_data} {self.flag_log} {self.flag_name} mongo"
         id = self.run(script, verbose=True)
 
@@ -93,6 +98,7 @@ class MongoDocker(object):
         :return:
         """
 
+        HEADING()
         if auth:
             auth_flag = "--auth"
         else:
@@ -113,6 +119,7 @@ class MongoDocker(object):
         Starts the MongoDBd Container
         :return:
         """
+        HEADING()
 
         auth_flag = "--auth"
         if not auth:
@@ -144,6 +151,7 @@ class MongoDocker(object):
         test if mongo is available
         :return:
         """
+        HEADING()
         bar = Bar('Cloudmesh Docker Setup', max=delay)
         for i in range(delay):
             try:
@@ -170,6 +178,7 @@ class MongoDocker(object):
         Creates the admin user in the Container
         :return:
         """
+        HEADING()
         script = \
           f"docker exec {self.NAME}  mongo admin --eval "\
           '"'\
