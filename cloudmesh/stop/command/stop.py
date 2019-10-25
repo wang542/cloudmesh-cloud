@@ -2,6 +2,7 @@ from cloudmesh.mongo.MongoDBController import MongoDBController
 from cloudmesh.shell.command import PluginCommand
 from cloudmesh.shell.command import command
 from cloudmesh.common.console import Console
+from cloudmesh.configuration.Config import Config
 
 class StopCommand(PluginCommand):
 
@@ -20,9 +21,33 @@ class StopCommand(PluginCommand):
 
         """
 
-        print("MongoDB stop")
-        if MongoDBController().service_is_running():
-            MongoDBController().stop()
-        else:
-            Console.ok("MongoDB service is already stopped")
 
+        print("MongoDB stop")
+
+        status = False
+
+        config=Config()
+        data = config["cloudmesh.data.mongo"]
+
+        mode = data['MODE']
+
+        if mode == 'docker':
+            from cloudmesh.mongo.MongoDocker import MongoDocker
+            mongo = MongoDocker()
+
+            status = mongo.status(auth=True)
+            if status['status'] == 'ok':
+
+                id = mongo.id()
+
+                mongo.stop()
+
+        else:
+
+
+            if MongoDBController().service_is_running():
+                MongoDBController().stop()
+            else:
+                Console.ok("MongoDB service is already stopped")
+
+        return ""

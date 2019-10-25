@@ -12,6 +12,7 @@ import time
 import sys
 import shutil
 from progress.bar import Bar
+# from progress.counter import Counter
 from cloudmesh.common.dotdict import dotdict
 from cloudmesh.common.debug import TRACE
 from cloudmesh.common.util import HEADING
@@ -21,7 +22,7 @@ class MongoDocker(object):
 
 
     def __init__(self, configuration="~/.cloudmesh/cloudmesh.yaml", dryrun=False):
-        HEADING()
+
         path = path_expand(configuration)
         self.config = Config(config_path=path)
         self.data = self.config["cloudmesh.data.mongo"]
@@ -37,11 +38,13 @@ class MongoDocker(object):
         self.mongo_log=path_expand(self.data["MONGO_DOWNLOAD"]["docker"]["MONGO_LOG"])
         self.version=self.data["MONGO_DOWNLOAD"]["docker"]["version"]
 
+        self.flag_nw = "--network=cloudmesh_nw"
         self.flag_name = "--name cloudmesh-mongo"
         self.flag_data = f"-v {self.mongo_path}:/data/db"
         self.flag_log = f"-v {self.mongo_log}/mongod.log:/var/log/mongodb/mongodb.log"
         self.flag_dot_cloudmesh = f"-v ~/.cloudmesh:/root/.cloudmesh"
         self.flag_dot_ssh = f"-v ~/.ssh:/root/.ssh"
+
 
     def run(self, script, verbose=True, terminate=False):
         if verbose:
@@ -70,7 +73,7 @@ class MongoDocker(object):
         Starts the MongoDBd Container
         :return:
         """
-        HEADING()
+
         script = f"docker run -d -p 127.0.0.1:27017:27017/tcp {self.flag_data} {self.flag_log} {self.flag_name} mongo"
         id = self.run(script, verbose=True)
 
@@ -98,19 +101,23 @@ class MongoDocker(object):
         :return:
         """
 
-        HEADING()
         if auth:
-            auth_flag = "--auth"
+            auth_flag = "--auth --bind_ip_all"
         else:
             auth_flag = ""
-        script = f"docker run -d -p 127.0.0.1:27017:27017/tcp {self.flag_dot_ssh} {self.flag_dot_cloudmesh} {self.flag_data} {self.flag_log} {self.flag_name} mongo {auth_flag}"
-        id = self.run(script)
+        script = f"docker run -d -p 27017:27017 {self.flag_nw} {self.flag_dot_ssh} {self.flag_dot_cloudmesh} {self.flag_data} {self.flag_log} {self.flag_name} mongo {auth_flag}"
+
+        id = self.run(script, verbose=False)
 
         Console.ok("Starting docker mongo container with id")
         Console.msg("")
         Console.msg(f"   {id}")
         Console.msg("")
-        print (script)
+
+        self.wait(delay=20, verbose=False)
+
+    def id(self):
+        return self.run('docker ps -q --filter "name=cloudmesh-mongo"', verbose=False)
 
 
 
@@ -119,9 +126,7 @@ class MongoDocker(object):
         Starts the MongoDBd Container
         :return:
         """
-        HEADING()
-
-        auth_flag = "--auth"
+        auth_flag = f"-u {self.username} -p {self.password}"
         if not auth:
             auth_flag = ""
 
@@ -138,10 +143,22 @@ class MongoDocker(object):
         Stops the MongoDBd Container
         :return:
         """
+
         try:
-            script = \
-                f"docker stop {self.NAME}"
-            self.run(script)
+            id = self.run("docker ps -q -f name=cloudmesh-mongo", verbose=False)
+
+            Console.ok(f"Stopping container cloudmesh-mongo with id {id}")
+
+            self.run(f"docker stop {id}", verbose=False)
+            self.run(f"docker rm {id}", verbose=False)
+
+            probe = self.run("docker ps -q -f name=cloudmesh-mongo")
+
+            if probe == "":
+                Console.ok(f"Container cloudmesh-mongo with id {id} sucessfully stopped.")
+            else:
+                Console.ok(f"Container cloudmesh-mongo with id {id} could not be stopped.")
+
         except:
             pass
 
@@ -151,8 +168,8 @@ class MongoDocker(object):
         test if mongo is available
         :return:
         """
-        HEADING()
-        bar = Bar('Cloudmesh Docker Setup', max=delay)
+
+        bar = Bar('Cloudmesh Docker Setup (in Seconds)', max=delay)
         for i in range(delay):
             try:
                 result = self.execute(
@@ -178,7 +195,7 @@ class MongoDocker(object):
         Creates the admin user in the Container
         :return:
         """
-        HEADING()
+
         script = \
           f"docker exec {self.NAME}  mongo admin --eval "\
           '"'\
@@ -274,7 +291,6 @@ class MongoDocker(object):
         msg = "No mongod running"
         state = "error"
 
-        print ("XXX")
         try:
             result = self.execute(
                 "\"printjson(db.adminCommand('listDatabases'))\"",

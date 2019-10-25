@@ -71,8 +71,8 @@ class CmDatabase(object):
         try:
             self.client = MongoClient(
                 f"mongodb://{self.username}:{self.password}@{self.host}:{self.port}",
-                connectTimeoutMS=3000,
-                serverSelectionTimeoutMS=3000
+                connectTimeoutMS=5000,
+                serverSelectionTimeoutMS=5000
             )
             self.db = self.client[self.database]
 
@@ -382,7 +382,7 @@ class CmDatabase(object):
 
             except ServerSelectionTimeoutError as e:
 
-                Console.error("Please start the cloudmesh Database")
+                Console.error("Please start the cloudmesh database")
                 Console.msg("")
                 Console.msg("   cms admin mongo start")
                 Console.msg("")
