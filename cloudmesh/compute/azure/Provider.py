@@ -891,8 +891,8 @@ class Provider(ComputeNodeABC, ComputeProviderPlugin):
             else:
                 nsg = self.network_client.network_security_groups.get(group, secgroup)
             return nsg.id
-        except:
-            raise Exception("This network security group doesn't exist")
+        except Exception as e:
+            Console.error(e)
 
     def create(self, name=None,
                image=None,
