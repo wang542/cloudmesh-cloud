@@ -878,6 +878,22 @@ class Provider(ComputeNodeABC, ComputeProviderPlugin):
                                                       rules).wait()
         Console.info(f'Security rules {str(rules)} from az!')
 
+    def get_security_groupID(self, secgroup,group):
+        """
+
+        :param secgroup:
+        :return: security group id for attachment in Nic creation
+        """
+        try:
+            if secgroup is None:
+                secgroup_name = 'default'
+                nsg = self.network_client.network_security_groups.get(group, secgroup_name)
+            else:
+                nsg = self.network_client.network_security_groups.get(group, secgroup)
+            return nsg.id
+        except:
+            raise Exception("This network security group doesn't exist")
+
     def create(self, name=None,
                image=None,
                size=None,
@@ -904,13 +920,13 @@ class Provider(ComputeNodeABC, ComputeProviderPlugin):
         :return:
         """
 
-        vm_parameters = self.create_vm_parameters()
+
 
         if group is None:
             group = self.GROUP_NAME
         if name is None:
             name = self.VM_NAME
-
+        vm_parameters = self.create_vm_parameters(secgroup,group)
         async_vm_creation = self.vms.create_or_update(
             group,
             name,
@@ -955,9 +971,9 @@ class Provider(ComputeNodeABC, ComputeProviderPlugin):
 
         return self.info(group, name, 'ACTIVE')
 
-    def create_vm_parameters(self):
+    def create_vm_parameters(self, secgroup,group):
         # TODO: Joaquin -> Completed
-        nic = self.create_nic()
+        nic = self.create_nic(secgroup,group)
 
         # Parse Image from yaml file
 
@@ -995,7 +1011,7 @@ class Provider(ComputeNodeABC, ComputeProviderPlugin):
 
         return vm_parameters
 
-    def create_nic(self):
+    def create_nic(self, secgroup,group):
         # TODO: Joaquin -> Completed
         """
             Create a Network Interface for a Virtual Machine
@@ -1003,6 +1019,9 @@ class Provider(ComputeNodeABC, ComputeProviderPlugin):
         """
         # A Resource group needs to be in place
         self.get_resource_group()
+
+        # get secGroupId
+        sec_group_id = self.get_security_groupID(secgroup,group)
 
         # Create Virtual Network
         VERBOSE(" ".join('Create Vnet'))
@@ -1026,6 +1045,7 @@ class Provider(ComputeNodeABC, ComputeProviderPlugin):
             self.VNET_NAME,
             self.SUBNET_NAME,
             {'address_prefix': '10.0.0.0/24'}
+
         )
         subnet_info = async_subnet_creation.result()
 
@@ -1042,7 +1062,10 @@ class Provider(ComputeNodeABC, ComputeProviderPlugin):
                         'subnet': {
                             'id': subnet_info.id
                         }
-                    }]
+                    }],
+                    'network_security_group': {
+                        'id': sec_group_id
+                    }
                 }
             )
 
