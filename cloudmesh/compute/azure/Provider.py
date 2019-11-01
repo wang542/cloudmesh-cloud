@@ -18,8 +18,29 @@ from cloudmesh.common.console import Console
 from cloudmesh.common.debug import VERBOSE
 from cloudmesh.common.util import HEADING
 from cloudmesh.configuration.Config import Config
+from msrestazure.azure_exceptions import CloudError
 
 CLOUDMESH_YAML_PATH = "~/.cloudmesh/cloudmesh.yaml"
+
+
+def _remove_mongo_id_obj(dict_list):
+    for i in dict_list:
+        try:
+            i.pop('_id')
+        except KeyError:
+            pass
+
+    return dict_list
+
+
+def _get_az_vm_status(az_status):
+    az_status = az_status.lower()
+    if 'running' in az_status:
+        return 'ACTIVE'
+    elif 'stopped' in az_status:
+        return 'STOPPED'
+    else:
+        return None
 
 
 class Provider(ComputeNodeABC, ComputeProviderPlugin):
@@ -300,14 +321,25 @@ class Provider(ComputeNodeABC, ComputeProviderPlugin):
 
     def keys(self):
         # TODO: Moeen
-        raise NotImplementedError
+        # raise NotImplementedError
+        Console.error("Key list is not supported in Azure!")
+        Console.msg("Please use ")
+        Console.msg("")
+        Console.msg("    cms key list ")
+        Console.msg("")
+        return None
 
     def key_upload(self, key=None):
         # TODO: Moeen
-        raise NotImplementedError
+        # raise NotImplementedError
+        Console.error("Key upload is not supported in Azure!")
+        return None
 
     def key_delete(self, name=None):
         # TODO: Moeen
+        raise NotImplementedError
+
+    def get_public_ip(self, name=None):
         raise NotImplementedError
 
     # these are available to be associated
@@ -531,7 +563,9 @@ class Provider(ComputeNodeABC, ComputeProviderPlugin):
             raise ValueError(f'No security groups were not found in '
                              f'local db for: {name}')
 
-        return list(local_sec_group)
+        res = list(local_sec_group)
+
+        return _remove_mongo_id_obj(res)
 
     def _get_local_sec_rules(self, group_name=None):
         # if group_name is none, return all sec rules
@@ -546,7 +580,7 @@ class Provider(ComputeNodeABC, ComputeProviderPlugin):
                 self.cmDatabase.collection('local-secrule').find(query)
             )
 
-        return sec_rules
+        return _remove_mongo_id_obj(sec_rules)
 
     def list_secgroup_rules(self, name='default'):
         # TODO: Joaquin
@@ -560,11 +594,13 @@ class Provider(ComputeNodeABC, ComputeProviderPlugin):
         Console.info(f'local security rules for \'{name}\': '
                      f'{str(local_sec_rules)}')
 
-        az_sec_rules = self.network_client.security_rules.list(
-            self.GROUP_NAME, name)
-
-        Console.info(f'az security rules for \'{name}\': ')
-        [Console.info(i.__str__()) for i in az_sec_rules]
+        try:
+            az_sec_rules = self.network_client.security_rules.list(
+                self.GROUP_NAME, name)
+            Console.info(f'az security rules for \'{name}\': ')
+            [Console.info(i.__str__()) for i in az_sec_rules]
+        except CloudError as e:
+            Console.warning("Error in pulling sec rules: " + str(e))
 
     def _sec_rules_local_to_az(self, sec_rule_names):
         # local rules from the db
@@ -969,7 +1005,7 @@ class Provider(ComputeNodeABC, ComputeProviderPlugin):
         )
         async_disk_attach.wait()
 
-        return self.info(group, name, 'ACTIVE')
+        return self.info(group, name, 'ACTIVE')[0]
 
     def create_vm_parameters(self, secgroup,group):
         # TODO: Joaquin -> Completed
@@ -1131,7 +1167,7 @@ class Provider(ComputeNodeABC, ComputeProviderPlugin):
         # Stop the VM
         VERBOSE(" ".join('Stopping Azure VM'))
         async_vm_stop = self.vms.power_off(group, name)
-        async_vm_stop.wait()
+        async_vm_stop.result()
         return self.info(group, name, 'SHUTOFF')
 
     def resume(self, group=None, name=None):
@@ -1181,10 +1217,12 @@ class Provider(ComputeNodeABC, ComputeProviderPlugin):
         if name is None:
             name = self.VM_NAME
 
-        node = self.vms.get(group, name)
+        node = self.vms.get(group, name, expand='instanceView')
 
         nodedict = node.as_dict()
-        nodedict['status'] = status
+
+        az_status = node.instance_view.statuses[-1].code.lower()
+        nodedict['status'] = _get_az_vm_status(az_status)
 
         return self.update_dict(nodedict, kind='vm')
 
@@ -1212,25 +1250,35 @@ class Provider(ComputeNodeABC, ComputeProviderPlugin):
         """
         if group is None:
             group = self.GROUP_NAME
+
         if name is None:
-            name = self.VM_NAME
+            vms = self.list()
+        else:
+            vms = filter(lambda x: x['name'] == name, self.list())
 
-        # Delete VM
-        VERBOSE(" ".join('Deleting Azure Virtual Machine'))
-        server = self.vms.delete(group, name)
-        server.wait()
+        # Delete vms
+        res = []
+        for vm in vms:
+            elm = {}
+            VERBOSE(" ".join('Deleting Azure Virtual Machine'))
+            del_vm = self.vms.delete(group, vm['name'])
+            del_vm.wait()
 
-        # Delete Resource Group
+            elm['name'] = vm['name']
+            elm['status'] = 'TERMINATED'
+            elm['type'] = vm['type']
+            elm['location'] = vm['location']
+            res.append(elm)
+
+        res = self.update_dict(res, kind='vm')
+
+        # # Delete Resource Group
         VERBOSE(" ".join('Deleting Azure Resource Group'))
         async_group_delete = self.resource_client.resource_groups.delete(
             group)
         async_group_delete.wait()
 
-        server['status'] = 'DELETED'
-
-        servers = self.update_dict([server], kind='vm')
-
-        return servers
+        return res
 
     def images(self, **kwargs):
         # TODO: Joaquin -> Completed
@@ -1456,4 +1504,4 @@ class Provider(ComputeNodeABC, ComputeProviderPlugin):
              vm=None,
              interval=None,
              timeout=None):
-        raise NotImplementedError;
+        return self.list()

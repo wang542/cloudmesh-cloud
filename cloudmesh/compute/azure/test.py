@@ -93,5 +93,10 @@ p = prv.Provider()
 
 # p.add_rules_to_secgroup('test', rules=['ssh', 'ssh2'])
 
-p.upload_secgroup('test')
+# p.upload_secgroup('test')
+
+p.destroy()
+
+# out = p.info(name='test-niranda-vm-20')
+# p.stop(name='test-niranda-vm-19')
 pass
