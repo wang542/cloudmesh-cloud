@@ -434,6 +434,9 @@ class Provider(ComputeNodeABC, ComputeProviderPlugin):
                 'ip_configurations': [ip_config]
             }
         )
+        query={'name': self.VM_NAME}
+        update={'ip_public':ip}
+        self.cmDatabase.collection('azure-vm').update_one(query, update)
 
         return res.result()
 

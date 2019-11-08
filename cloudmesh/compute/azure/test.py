@@ -1,12 +1,12 @@
-from cloudmesh.compute.azure import Provider as prv
-from azure.cli.core import get_default_cli
+from cloudmesh.compute.vm import Provider as prv
+# from azure.cli.core import get_default_cli
 import time
 import json
 
 # AZURE_CLI = 'az'
 SERVICE_PRINCIPAL = 'cloudmesh'
 
-cli = get_default_cli()
+# cli = get_default_cli()
 
 
 def get_az_account_list():
@@ -50,7 +50,7 @@ sp_cred = {}
 # }
 # print("Cred: " + str(cred))
 
-p = prv.Provider()
+p = prv.Provider('azure')
 
 # p.list()
 # p.info()
@@ -95,7 +95,7 @@ p = prv.Provider()
 
 # p.upload_secgroup('test')
 
-p.destroy()
+# p.destroy()
 
 # out = p.info(name='test-niranda-vm-20')
 # p.stop(name='test-niranda-vm-19')
