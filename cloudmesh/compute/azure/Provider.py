@@ -1,6 +1,10 @@
 from ast import literal_eval
 from datetime import datetime
 from pprint import pprint
+from sys import platform
+import ctypes
+import os
+import subprocess
 
 from azure.common.credentials import ServicePrincipalCredentials
 from azure.mgmt.compute import ComputeManagementClient
@@ -434,8 +438,8 @@ class Provider(ComputeNodeABC, ComputeProviderPlugin):
                 'ip_configurations': [ip_config]
             }
         )
-        query={'name': self.VM_NAME}
-        update={'ip_public':ip}
+        query = {'name': self.VM_NAME}
+        update = {'ip_public':ip}
         self.cmDatabase.collection('azure-vm').update_one(query, update)
 
         return res.result()
@@ -447,8 +451,77 @@ class Provider(ComputeNodeABC, ComputeProviderPlugin):
     # see the openstack example it will be almost the same as in openstack
     # other than getting
     # the ip and username
+    # unlike openstack and aws, azure ssh requires actual vm usenname used during creation
     def ssh(self, vm=None, command=None):
-        raise NotImplementedError
+        # uncertain database filed name, double check
+        cm = CmDatabase()
+        username = self.USERNAME
+        ip = vm['ip_public']
+        keyname = vm['key_name']
+        keys = cm.find_all_by_name(name=keyname,kind="key")
+        for k in keys:
+            if 'location' in k.keys():
+                if 'private' in k['location'].keys():
+                    key = k['location']['private']
+                    break
+        cm.close_client()
+
+        if command is None:
+            command = ""
+
+        location = username + '@' + ip
+        cmd = "ssh " \
+              "-o StrictHostKeyChecking=no " \
+              "-o UserKnownHostsFile=/dev/null " \
+              f"-i {key} {location} {command}"
+        cmd = cmd.strip()
+
+        if command == "":
+            if platform.lower() == 'win32':
+                class disable_file_system_redirection:
+                    _disable = ctypes.windll.kernel32.Wow64DisableWow64FsRedirection
+                    _revert = ctypes.windll.kernel32.Wow64RevertWow64FsRedirection
+
+                    def __enter__(self):
+                        self.old_value = ctypes.c_long()
+                        self.success = self._disable(ctypes.byref(self.old_value))
+
+                    def __exit__(self, type, value, traceback):
+                        if self.success:
+                            self._revert(self.old_value)
+                with disable_file_system_redirection():
+                    os.system(cmd)
+            else:
+                os.system(cmd)
+        else:
+            if platform.lower() == 'win32':
+                class disable_file_system_redirection:
+                    _disable = ctypes.windll.kernel32.Wow64DisableWow64FsRedirection
+                    _revert = ctypes.windll.kernel32.Wow64RevertWow64FsRedirection
+
+                    def __enter__(self):
+                        self.old_value = ctypes.c_long()
+                        self.success = self._disable(ctypes.byref(self.old_value))
+
+                    def __exit__(self, type, value, traceback):
+                        if self.success:
+                            self._revert(self.old_value)
+                with disable_file_system_redirection():
+                    ssh = subprocess.Popen(cmd,
+                                           shell=True,
+                                           stdout=subprocess.PIPE,
+                                           stderr=subprocess.PIPE)
+            else:
+                ssh = subprocess.Popen(cmd,
+                                   shell=True,
+                                   stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE)
+            result = ssh.stdout.read().decode("utf-8")
+            if not result:
+                error = ssh.stderr.readlines()
+                print("ERROR: %s" % error)
+            else:
+                return result
 
     def get_resource_group(self):
         # TODO: Joaquin -> Completed
@@ -933,6 +1006,21 @@ class Provider(ComputeNodeABC, ComputeProviderPlugin):
         except Exception as e:
             Console.error(e)
 
+    def get_key_info(self, keys):
+        key_lst = []
+        if type(keys) is list:
+            for key in keys:
+                key_set=self.cmDatabase.collection('local-key').find({"name": key})
+                path = key_set['path']
+                key_data = key_set['public_key']
+                key_lst.append({'path': path, 'keyData': key_data})
+        else:
+            key_set = self.cmDatabase.collection('local-key').find({"name": keys})
+            path = key_set['path']
+            key_data = key_set['public_key']
+            key_lst.append({'path': path, 'keyData': key_data})
+        return key_lst
+
     def create(self, name=None,
                image=None,
                size=None,
@@ -965,7 +1053,7 @@ class Provider(ComputeNodeABC, ComputeProviderPlugin):
             group = self.GROUP_NAME
         if name is None:
             name = self.VM_NAME
-        vm_parameters = self.create_vm_parameters(secgroup,group)
+        vm_parameters = self.create_vm_parameters(secgroup, group, key)
         async_vm_creation = self.vms.create_or_update(
             group,
             name,
@@ -1010,7 +1098,7 @@ class Provider(ComputeNodeABC, ComputeProviderPlugin):
 
         return self.info(group, name, 'ACTIVE')[0]
 
-    def create_vm_parameters(self, secgroup,group):
+    def create_vm_parameters(self, secgroup,group, key):
         # TODO: Joaquin -> Completed
         nic = self.create_nic(secgroup,group)
 
@@ -1023,12 +1111,21 @@ class Provider(ComputeNodeABC, ComputeProviderPlugin):
         """
             Create the VM parameters structure.
         """
+        if key is None:
+            raise ValueError("Key must be set. Use cms set key=<key name>")
+        key_lst = self.get_key_info(key)
         vm_parameters = {
             'location': self.LOCATION,
             'os_profile': {
                 'computer_name': self.VM_NAME,
                 'admin_username': self.USERNAME,
-                'admin_password': self.PASSWORD
+                'admin_password': self.PASSWORD,
+                'linuxConfiguration':{
+                    'disablePasswordAuthentication':True,
+                    'ssh': {
+                        'publicKeys': key_lst
+                    }
+                }
             },
             'hardware_profile': {
                 'vm_size': 'Standard_DS1_v2'
