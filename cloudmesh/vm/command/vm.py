@@ -506,7 +506,8 @@ class VmCommand(PluginCommand):
                 if arguments['--dryrun']:
                     print(f"start node {name}")
                 else:
-                    vms = provider.start(names=name, cloud=cloud)
+                    print(f"start node {name}")
+                    vms = provider.start(name=name, cloud=cloud)
 
                     provider.Print(vms, output=arguments.output, kind="vm")
 
@@ -676,7 +677,7 @@ class VmCommand(PluginCommand):
                     # parameters.progress = len(parameters.names) < 2
 
                     vms = provider.create(**parameters)
-                    variables['vm'] = str(n)
+                    variables['vm'] = str(names)
                     if arguments["-v"]:
                         banner("Details")
                         pprint(vms)
